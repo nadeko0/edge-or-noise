@@ -1,5 +1,7 @@
 # tick-ml-research
 
+*English · [Русский](README.ru.md) · [Slovenčina](README.sk.md)*
+
 Research project: does a machine-learning classifier find a tradeable
 short-horizon scalping edge in Bybit perpetual-futures **tick-level**
 data (trades, order book, liquidations, funding, open interest) — as
@@ -59,21 +61,38 @@ $ / total losing $; above 1.0 means net profitable after fees) on a
 sample large enough to trust.
 Full numbers: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md).
 
+<p align="center">
+  <img src="figures/permutation_test.png" width="90%" alt="Observed AUC plotted against a null distribution built from 60 label-shuffled runs — the real result sits far outside where random labels land.">
+</p>
+<p align="center">
+  <img src="figures/auc_by_horizon.png" width="49%" alt="Bar chart: ROC-AUC decreases from 0.669 at a 1-minute horizon down to 0.580 at a 10-minute horizon.">
+  <img src="figures/feature_importance.png" width="49%" alt="Horizontal bar chart of XGBoost feature importances: rolling realized volatility and bar range dominate; order-flow features rank near the bottom.">
+</p>
+
 ---
 
 ## Data
 
-| Source | Collected by | Symbols | Period | Included in repo? |
+| Source | Collected by | Symbols collected | Period | Included in repo? |
 |---|---|---|---|---|
 | Live tick data (trades, order book, liquidations, tickers/funding/OI) | This project's own WS collector (`collector/`) | 24 Bybit USDT perpetuals | 2026-04-22 → 2026-07-20 (90 days) | No — raw data is ~100 GB, gitignored |
-| Historical tick data (out-of-sample check) | Third-party archive found online (not collected by this project) | BTC, ETH, SOL only | 2024-02-12 → 2024-06-02 (112 days) | No — not redistributable |
+| Historical tick data (out-of-sample check) | Third-party archive found online (not collected by this project) | BTC, ETH, SOL | 2024-02-12 → 2024-06-02 (112 days) | No — not redistributable |
+
+The collector captures 24 symbols, but the actual experiments here
+only use **BTCUSDT** (primary, ~80 hypotheses), plus **ETHUSDT** and
+**SOLUSDT** for cross-asset checks against the same 90-day live
+window. The historical archive covers BTC/ETH/SOL, but the
+out-of-sample confirmation in this repo (`experiments/06`) only
+trains/scores against its **BTC** data — see
+[`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md#data-coverage-by-hypothesis)
+for the exact symbol/period breakdown per hypothesis, including the
+collector's own mid-dataset format change (2026-05-01/02).
 
 Both datasets share the same bar-construction and feature pipeline
 (`tickml/loaders_live.py`, `tickml/loaders_sferez.py`), which is what
 makes the out-of-sample comparison in `experiments/06_sferez_oos_confirmation.py`
 meaningful: same features, same labeling, same code path, a
-different year and (for ETH/SOL) different data source than what any
-model in this repo was trained on.
+different year than what any model in this repo was trained on.
 
 To reproduce anything here you need your own copy of similarly-shaped
 tick data. Set:
@@ -181,7 +200,8 @@ Documented in full with numbers in
   the signal is not directional.
 - Order-book depth beyond top-of-book, replayed from raw L2 deltas,
   including an explicit "whale wall" (anomalously large single resting
-  order) feature — no measurable effect.
+  order) feature — no measurable effect, confirmed both on the full
+  90-day window and on a restricted single-schema window (see below).
 - 4 model engines (XGBoost, LightGBM, CatBoost, RandomForest) —
   interchangeable results.
 - A full classical technical-indicator library (RSI, MACD, Bollinger,
@@ -231,3 +251,5 @@ Each `experiments/*.py` file is independently runnable and prints its
 own results; none require the others to have run first (aside from a
 local parquet cache written to `.cache/` on first load of a given
 symbol, to avoid re-parsing gigabytes of gzip on every run).
+`experiments/08_make_figures.py` regenerates the 3 PNGs embedded above
+into `figures/`.

@@ -3,10 +3,34 @@
 ~80 hypotheses tested against 1-minute-bar features built from raw
 tick data (trades, order book, liquidations, funding, open interest).
 Raw results referenced below correspond to the scripts in
-`experiments/`. Data: BTCUSDT (primary), ETHUSDT/SOLUSDT (cross-asset
-checks), 2026-04-22 → 2026-07-20 (90 days, self-collected) plus an
-independent 2024 dataset (BTC/ETH/SOL, 112 days, third-party archive)
-used exclusively as an out-of-sample check.
+`experiments/`.
+
+## Data coverage by hypothesis
+
+Not every hypothesis was run against every symbol or the full date
+range -- stated explicitly here rather than left implicit:
+
+| What was tested | Symbol(s) | Period | Script(s) |
+|---|---|---|---|
+| Core hypotheses: labeling variants, model engines, TA indicators, leverage, funding/OI, SMC concepts | BTCUSDT | 2026-04-22 → 2026-07-20 (90 days, self-collected) | `01`–`05`, `07`, `08` |
+| Real L2 order-book depth / whale-wall | BTCUSDT | Full 90 days (blended schema) and a restricted 2026-05-02 → 2026-07-20 single-schema window (see §4) | `03` |
+| Cross-asset walk-forward (own model) | ETHUSDT, SOLUSDT | Same 90-day window as BTC | `06` |
+| Cross-asset OOS (BTC-trained model scored on another symbol) | ETHUSDT, SOLUSDT | Same 90-day window as BTC | `06` |
+| Independent-year OOS confirmation | **BTCUSDT only** | 2024-02-12 → 2024-06-02 (112 days, third-party archive) | `06` |
+
+The third-party 2024 archive is structured to also cover ETH and SOL,
+but this repo's out-of-sample check only trains/scores against its BTC
+data -- an ETH/SOL run against that archive was not performed here and
+should not be assumed from the BTC result.
+
+The collector was upgraded on 2026-05-01 to also capture
+`orderbook.rpi` (retail price improvement) and to switch the main
+`orderbook.50` feed to raw 50-level deltas (previously a coarser
+pre-aggregated top-5 snapshot, see §4) -- 2026-05-01 itself is a
+partial/transitional day from that restart, so 2026-05-02 is used as
+the clean start of the new format. `orderbook.rpi` is collected but
+not used by any experiment in this repo (not part of the ~80 tested
+hypotheses).
 
 ## Summary
 
@@ -95,7 +119,23 @@ alone reaches 96% of the full 21-feature XGBoost model's AUC. Real L2
 order-book depth (replayed from raw 50-level deltas, not just
 top-of-book), a "whale wall" feature (anomalously large single resting
 order vs. local median), funding rate, and open interest each added no
-measurable improvement. A full classical technical-indicator library
+measurable improvement.
+
+The collector's own order-book capture changed format mid-dataset
+(2026-05-02: an early pre-aggregated top-5-level snapshot was replaced
+by raw 50-level deltas, see `tickml/orderbook_l2.py`), so the 90-day
+result above blends two collection eras. Rerunning the same comparison
+restricted to the single-schema window (2026-05-02 → 2026-07-20, where
+top10-depth and whale-wall coverage is 100% rather than partial)
+confirms the same conclusion, not an artifact of the blend:
+
+| Feature set (2026-05-02 → 2026-07-20 only) | AUC |
+|---|---|
+| Baseline | 0.594 |
+| + top10 depth / book-depth-ratio | 0.593 |
+| + whale-wall size ratio | 0.595 |
+
+A full classical technical-indicator library
 (RSI, MACD, Bollinger, ADX, Stochastic, SuperTrend, Hurst exponent,
 CMF, Fisher transform, KAMA, MFI, linear-regression slope/R², z-score,
 efficiency ratio) added +0.004 AUC over the price/volatility baseline;

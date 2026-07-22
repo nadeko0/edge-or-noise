@@ -17,6 +17,7 @@ dependencies = [
     "catboost>=1.2",
     "websockets>=16.0",
     "redis>=5.0",
+    "matplotlib>=3.8",
 ]
 
 [dependency-groups]
