@@ -1,0 +1,193 @@
+# tick-ml-research
+
+Research project: does a machine-learning classifier find a tradeable
+short-horizon scalping edge in Bybit perpetual-futures **tick-level**
+data (trades, order book, liquidations, funding, open interest) — as
+opposed to slower candle/indicator-based strategies, which are out of
+scope here?
+
+**This repository is a research log, not a trading system.** It
+documents a methodology and its results, including negative results.
+Nothing in it is a recommendation to trade with real capital.
+
+---
+
+## Headline result
+
+A statistically real, cross-asset, cross-year predictive signal was
+found (ROC-AUC ≈ 0.58–0.67 depending on the prediction horizon), but it
+is almost entirely explained by short-term realized-volatility
+clustering, not order flow, order-book depth, or direction. No tested
+configuration (~80 hypotheses: stop-loss variants, 4 model engines,
+order-book depth, technical indicators, leverage, funding rate, open
+interest, and several literal "smart money" concepts) produced a
+profit factor reliably above 1.0 on a sample large enough to trust.
+Full numbers: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md).
+
+---
+
+## Data
+
+| Source | Collected by | Symbols | Period | Included in repo? |
+|---|---|---|---|---|
+| Live tick data (trades, order book, liquidations, tickers/funding/OI) | This project's own WS collector (`collector/`) | 24 Bybit USDT perpetuals | 2026-04-22 → 2026-07-20 (90 days) | No — raw data is ~100 GB, gitignored |
+| Historical tick data (out-of-sample check) | Third-party archive found online (not collected by this project) | BTC, ETH, SOL only | 2024-02-12 → 2024-06-02 (112 days) | No — not redistributable |
+
+Both datasets share the same bar-construction and feature pipeline
+(`tickml/loaders_live.py`, `tickml/loaders_sferez.py`), which is what
+makes the out-of-sample comparison in `experiments/06_sferez_oos_confirmation.py`
+meaningful: same features, same labeling, same code path, a
+different year and (for ETH/SOL) different data source than what any
+model in this repo was trained on.
+
+To reproduce anything here you need your own copy of similarly-shaped
+tick data. Set:
+
+```bash
+export TICKML_DATA_DIR=/path/to/your/collector/output
+export TICKML_SFEREZ_DIR=/path/to/your/2024/historical/archive   # optional
+```
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Collection
+        WS["Bybit public WS<br/>(trades, liquidations,<br/>tickers, orderbook.50,<br/>orderbook.rpi)"]
+        COL["collector/<br/>(async WS client,<br/>reconnect + backoff)"]
+        DISK["data/*.jsonl.gz<br/>(one file per symbol per day)"]
+        WS --> COL --> DISK
+    end
+
+    subgraph Research["tickml/ research pipeline"]
+        LOAD["loaders_live.py /<br/>loaders_sferez.py<br/>(gzip -> 1-min bars)"]
+        L2["orderbook_l2.py<br/>(stateful L2 book replay,<br/>whale-wall detection)"]
+        FEAT["features.py<br/>(backward-looking<br/>rolling features)"]
+        LABEL["labeling.py<br/>(triple-barrier<br/>PT / SL / time-exit)"]
+        MODEL["models.py<br/>(XGBoost / LightGBM /<br/>CatBoost / RandomForest)"]
+        VALID["validation.py<br/>(walk-forward, purge,<br/>permutation test, OOS,<br/>equity curve)"]
+    end
+
+    DISK --> LOAD --> FEAT
+    DISK --> L2 --> FEAT
+    FEAT --> LABEL --> MODEL --> VALID
+    VALID --> REPORT["reports/FINAL_REPORT.md"]
+```
+
+---
+
+## Methodology
+
+### 1. Triple-barrier labeling
+
+Every 1-minute bar is labeled independently of any trading rule: "if a
+trade had entered at this bar's next open, would it have been
+profitable?" This separates "can a model rank bars by future outcome"
+from "does a hand-picked rule work" — the latter is what most public
+scalping strategies actually test, and it conflates the two questions.
+
+```mermaid
+flowchart TD
+    A["Bar i closes"] --> B["Hypothetical entry at<br/>bar i+1's open"]
+    B --> C{"Within next<br/>max_bars bars..."}
+    C -->|"price hits<br/>take-profit"| D["label = 1<br/>pnl = +PT - fees"]
+    C -->|"price hits<br/>stop-loss (optional)"| E["label = 0<br/>pnl = -SL - fees"]
+    C -->|"neither hit<br/>within max_bars"| F["exit at close of<br/>last bar (time-exit)<br/>label = pnl > 0"]
+```
+
+### 2. Walk-forward validation with a purge gap
+
+```mermaid
+flowchart LR
+    subgraph Fold1["Fold 1"]
+        T1["train: 0% – 55%"] --> G1["purge<br/>(max_bars+1 rows)"] --> V1["test: 55% – 70%"]
+    end
+    subgraph Fold2["Fold 2"]
+        T2["train: 0% – 70%"] --> G2["purge"] --> V2["test: 70% – 85%"]
+    end
+    subgraph Fold3["Fold 3"]
+        T3["train: 0% – 85%"] --> G3["purge"] --> V3["test: 85% – 100%"]
+    end
+    Fold1 --> Fold2 --> Fold3
+```
+
+The purge gap exists because a label at bar *i* depends on outcomes up
+to `max_bars` bars in the future — without it, a training row near the
+fold boundary could have a label that "sees into" the test window.
+
+### 3. Independent-dataset out-of-sample check
+
+The strongest test in this repo: train once on the full live (2026)
+dataset, then score the 2024 historical dataset, which was never used
+in training, feature selection, or threshold selection. A pattern that
+only exists in the window it was mined on will not survive this;
+`experiments/06_sferez_oos_confirmation.py` shows both a case where the
+core AUC finding *does* survive, and a case where two "excellent" small
+-sample results (n=17–26 trades) *do not* — the latter collapses back
+toward/below breakeven once re-tested against thousands of independent
+trades, the textbook signature of a multiple-comparisons false
+positive rather than a real pattern.
+
+---
+
+## What was tested and rejected
+
+Documented in full with numbers in
+[`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md). Summary:
+
+- Stop-loss variants (fixed and volatility-scaled) — no improvement,
+  in several cases worse than no stop-loss at all.
+- Trade direction (long vs. short) — statistically identical, evidence
+  the signal is not directional.
+- Order-book depth beyond top-of-book, replayed from raw L2 deltas,
+  including an explicit "whale wall" (anomalously large single resting
+  order) feature — no measurable effect.
+- 4 model engines (XGBoost, LightGBM, CatBoost, RandomForest) —
+  interchangeable results.
+- A full classical technical-indicator library (RSI, MACD, Bollinger,
+  ADX, Stochastic, SuperTrend, Hurst exponent, CMF, Fisher transform,
+  KAMA, MFI, linear-regression slope/R², z-score, efficiency ratio) —
+  marginal improvement (+0.004 AUC), same underlying volatility story.
+- Funding-rate extremes and open-interest/price quadrants as
+  contrarian signals — not statistically significant (p = 0.20 and
+  p = 0.61 respectively, permutation test).
+- A literal "liquidity sweep / stop hunt" rule (price wicks past a
+  recent swing level with a coincident liquidation spike) — looked
+  significant on 25 in-sample signals (p = 0.008) but failed a
+  parameter-sensitivity check and could not be confirmed on the
+  independent 2024 dataset (fired only 3–4 times there regardless of
+  parameters).
+- Leverage 1×–20×, simulated with a realistic MAE-based liquidation
+  model rather than naive PnL multiplication — liquidation risk was
+  ~0% at these leverages for the tested holding periods (1–5 minutes),
+  meaning leverage simply scales whatever result already existed; it
+  does not create an edge and amplifies the fragility of marginal
+  (PF ≈ 1.0–1.1) configurations.
+
+---
+
+## Repository layout
+
+```
+tickml/               core package: labeling, features, loaders, models, validation, L2 book replay
+collector/             Bybit WS collector that produced the live dataset (see Data section)
+experiments/           runnable scripts, each testing one group of hypotheses
+tests/                 correctness tests (no-lookahead checks, labeling edge cases, validation math)
+reports/FINAL_REPORT.md   full numeric writeup
+```
+
+## Running
+
+```bash
+uv sync
+export TICKML_DATA_DIR=/path/to/your/tick/data
+uv run pytest
+uv run experiments/01_baseline_and_horizon.py
+```
+
+Each `experiments/*.py` file is independently runnable and prints its
+own results; none require the others to have run first (aside from a
+local parquet cache written to `.cache/` on first load of a given
+symbol, to avoid re-parsing gigabytes of gzip on every run).

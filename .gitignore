@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+catboost_info/
+
+# Virtual environments
+.venv/
+
+# Raw tick data -- not shipped (tens of GB, not redistributable).
+# Point TICKML_DATA_DIR / TICKML_SFEREZ_DIR at your own copy.
+data/
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
