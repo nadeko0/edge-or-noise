@@ -49,8 +49,12 @@ def build_l2_bars(data_dir: Path, sym: str, dates: list[str]) -> pd.DataFrame:
 
 
 def _load_agg5_day(path):
-    """Tolerant of a mid-file schema switch/truncation -- skips lines
-    that don't match the expected keys instead of raising."""
+    """Tolerant of truncation/corruption (stops early on a read error
+    instead of raising) and of malformed individual lines (skipped).
+    Note: this does NOT detect or adapt to a genuine mid-file switch to
+    the raw50 schema -- any line missing 'bid5'/'T' is silently
+    dropped, so a true schema switch mid-file would show up as a
+    gap in coverage for the rest of that day, not a corrupted read."""
     rows, cur_bucket, last = [], None, None
     try:
         with gzip.open(path, "rt", encoding="utf-8") as fh:
@@ -74,6 +78,13 @@ def _load_agg5_day(path):
 
 
 def _agg5_row(bucket, o):
+    # o["imb"] in this early collector format is bid5/(bid5+ask5) in
+    # [0, 1] -- verified empirically against sample rows (e.g.
+    # bid5=0.875, ask5=7.178 -> imb=0.1087 == 0.875/(0.875+7.178)) since
+    # the original collector code that produced this format is no
+    # longer in the codebase. 2*imb-1 rescales it to the same
+    # (bid-ask)/(bid+ask) in [-1, 1] convention used by the raw50 path
+    # in _snapshot() below, so deep_obi5 is comparable across both.
     return dict(bucket=bucket, top5_bid=o["bid5"], top5_ask=o["ask5"],
                 top10_bid=np.nan, top10_ask=np.nan,
                 deep_obi5=2.0 * o["imb"] - 1.0, deep_obi10=np.nan,

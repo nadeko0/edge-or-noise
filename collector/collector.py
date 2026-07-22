@@ -62,7 +62,14 @@ async def _stream(
 
                 try:
                     async for raw in ws:
-                        _dispatch(name, raw, state, writer)
+                        try:
+                            _dispatch(name, raw, state, writer)
+                        except Exception as exc:
+                            # A single malformed/unexpected message must not
+                            # tear down the whole connection -- log and keep
+                            # reading. Only connection-level errors below
+                            # should trigger a reconnect.
+                            logger.error(f"[{name}] dispatch error on one message: {exc!r}")
                 finally:
                     stop.set()
                     ping_task.cancel()

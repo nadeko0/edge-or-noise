@@ -30,7 +30,10 @@ LIVE_DATES = [d.strftime("%Y-%m-%d") for d in pd.date_range(LIVE_START, LIVE_END
 
 
 def get_live(symbol: str) -> pd.DataFrame:
-    cache = CACHE_DIR / f"live_{symbol}.parquet"
+    # Cache key includes the date range on purpose: if LIVE_START/LIVE_END
+    # ever change, a stale cache from a different range must NOT be
+    # silently reused under the new-looking run.
+    cache = CACHE_DIR / f"live_{symbol}_{LIVE_START}_{LIVE_END}.parquet"
     if cache.exists():
         return pd.read_parquet(cache)
     df = build_live(symbol, LIVE_DATES)
@@ -42,11 +45,14 @@ def get_live(symbol: str) -> pd.DataFrame:
 def get_sferez(symbol3: str) -> pd.DataFrame:
     """symbol3: 'BTC' / 'ETH' / 'SOL' (matches the historical dataset's
     directory naming, base asset only, no USDT suffix)."""
-    cache = CACHE_DIR / f"sferez_{symbol3}.parquet"
-    if cache.exists():
-        return pd.read_parquet(cache)
     base = SFEREZ_DIR / symbol3
     dates = sorted(p.name for p in base.iterdir() if p.is_dir())
+    # Cache key includes the actual first/last date found on disk so a
+    # differently-dated archive can never be silently served from a
+    # stale cache (same rationale as get_live above).
+    cache = CACHE_DIR / f"sferez_{symbol3}_{dates[0]}_{dates[-1]}.parquet"
+    if cache.exists():
+        return pd.read_parquet(cache)
     df = build_sferez(base, dates)
     df = add_core_features(df)
     df.to_parquet(cache)

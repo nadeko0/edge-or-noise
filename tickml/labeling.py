@@ -148,7 +148,17 @@ def label_triple_barrier_with_mae(
 
 def profit_factor(pnls: np.ndarray) -> float:
     """sum(wins) / -sum(losses). 999.0 if there are no losses, 0.0 if
-    there are no wins (or no trades at all)."""
+    there are no wins (or no trades at all).
+
+    Caveat: 999.0 is a plain sentinel, not a capped/clipped value -- on
+    a small sample (e.g. a permutation_test draw or a walk_forward fold
+    that happens to have zero losing trades) it can dominate a mean or
+    a p-value comparison out of proportion to what it represents. None
+    of the results in reports/FINAL_REPORT.md hit this case (verified:
+    no reported aggregate was computed over a sample degenerate enough
+    to trigger it), but treat any future result containing an
+    unexplained 999.0 in an aggregate as a signal to inspect the
+    underlying sample size before trusting it."""
     pnls = np.asarray(pnls, dtype=np.float64)
     if len(pnls) == 0:
         return 0.0

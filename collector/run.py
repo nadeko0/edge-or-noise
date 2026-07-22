@@ -51,23 +51,31 @@ async def _flush_loop(state: CollectorState, writer: DailyWriter, interval: int)
 
 
 async def _stats_loop(state: CollectorState, interval: int = 30) -> None:
-    """Print a live snapshot every 30s so you can verify data is flowing."""
+    """Print a live snapshot every 30s so you can verify data is flowing.
+
+    This is diagnostic-only and must never be allowed to take down the
+    collector: it runs alongside the 5 live WS streams in the same
+    asyncio.gather(), so an uncaught exception here would cancel all of
+    them too."""
     await asyncio.sleep(interval)
     while True:
-        lines = []
-        for sym in sorted(cfg.SYMBOLS[:6]):  # show first 6 symbols
-            c1   = state.cvd(sym, 60)
-            c5   = state.cvd(sym, 300)
-            liqs = len(state.recent_liqs(sym, 300))
-            tick = state.get_ticker(sym)
-            ob   = state.get_ob_metrics(sym)
-            oi   = tick.get("openInterest", "?")
-            fr   = tick.get("fundingRate",  "?")
-            lines.append(
-                f"  {sym:16s} cvd1m={c1:+9.2f}  cvd5m={c5:+9.2f}  "
-                f"liqs={liqs}  oi={oi}  fr={fr}"
-            )
-        logger.info("-- snapshot --\n" + "\n".join(lines))
+        try:
+            lines = []
+            for sym in sorted(cfg.SYMBOLS[:6]):  # show first 6 symbols
+                c1   = state.cvd(sym, 60)
+                c5   = state.cvd(sym, 300)
+                liqs = len(state.recent_liqs(sym, 300))
+                tick = state.get_ticker(sym)
+                ob   = state.get_ob_metrics(sym)
+                oi   = tick.get("openInterest", "?")
+                fr   = tick.get("fundingRate",  "?")
+                lines.append(
+                    f"  {sym:16s} cvd1m={c1:+9.2f}  cvd5m={c5:+9.2f}  "
+                    f"liqs={liqs}  oi={oi}  fr={fr}"
+                )
+            logger.info("-- snapshot --\n" + "\n".join(lines))
+        except Exception as exc:
+            logger.error(f"[stats] snapshot formatting error (non-fatal): {exc!r}")
         await asyncio.sleep(interval)
 
 
