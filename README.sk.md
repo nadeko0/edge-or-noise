@@ -93,6 +93,19 @@ symbol/obdobie podľa hypotézy nájdete v
 (v angličtine), vrátane zmeny formátu dát kolektora uprostred datasetu
 (2026-05-01/02).
 
+**Prečo nie všetkých 24:** nezávislý archív z roku 2024 — najprísnejšia
+kontrola v tomto repozitári — pokrýva iba BTC/ETH/SOL, takže rozšírenie
+batérie ~80 hypotéz na zvyšných 21 symbolov by pripravilo analýzu o
+jediný test, ktorý naozaj odlíši reálny vzor od falošne pozitívneho
+výsledku. ETH/SOL boli vybrané na overenie, či sa zistenie z BTC
+prenáša na iné likvidné, etablované mince, nie na skenovanie celého
+zoznamu symbolov kvôli samostatnej výhode; spustenie rovnakej batérie
+pre každý symbol tiež lineárne rastie výpočtovo (samotný replay L2
+order booku trvá ~15 minút na symbol). Preskenovanie zvyšných altcoinov
+— ktoré sú tenšie a hlučnejšie a vyžadovali by vlastnú opatrnosť — je
+prirodzeným rozšírením, nie niečím, čo tento repozitár tvrdí, že
+vylúčil.
+
 Oba datasety zdieľajú rovnaký pipeline na tvorbu barov a príznakov
 (`tickml/loaders_live.py`, `tickml/loaders_sferez.py`) — práve to robí
 zmysluplným porovnanie mimo vzorky v

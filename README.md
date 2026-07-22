@@ -90,6 +90,18 @@ trains/scores against its **BTC** data — see
 for the exact symbol/period breakdown per hypothesis, including the
 collector's own mid-dataset format change (2026-05-01/02).
 
+**Why not all 24:** the independent 2024 archive — the strongest check
+in this repo — only covers BTC/ETH/SOL, so extending the ~80-hypothesis
+battery to the other 21 symbols would drop the one test that actually
+distinguishes a real pattern from a false positive. ETH/SOL were picked
+to check whether the BTC finding generalizes to other liquid, established
+coins, not to scan the full symbol list for a separate edge; running the
+same battery per-symbol also scales linearly in compute (the L2
+order-book replay alone takes ~15 minutes per symbol). Scanning the
+remaining altcoins — which are thinner and noisier, and would need
+their own care around that — is a natural extension, not something
+this repo claims to have ruled out.
+
 Both datasets share the same bar-construction and feature pipeline
 (`tickml/loaders_live.py`, `tickml/loaders_sferez.py`), which is what
 makes the out-of-sample comparison in `experiments/06_sferez_oos_confirmation.py`
