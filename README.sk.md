@@ -44,6 +44,24 @@ ma na čokoľvek priamo — spustil som každý experiment tu, rozumiem,
 prečo každý z nich zlyhal alebo obstál, a radšej detailne obhájim
 negatívny výsledok, než by som prikrášlil falošne pozitívny.
 
+Pre presnosť, keďže je ľahké toto zaokrúhliť: táto konkrétna, prísna
+práca s walk-forward validáciou má približne **7 mesiacov** (od
+približne decembra 2025). Predtým, od mája 2025, boli neformálne
+skúšobné behy na spotovom obchodovaní so základnými indikátormi cez
+TA-Lib — experimentálne, nie na úrovni prísnosti ukázanej v tomto
+repozitári. Radšej to poviem otvorene, než aby to znelo, že táto
+úroveň prísnosti existovala celý rok, keď to tak nebolo.
+
+Časť mojej skoršej práce na sviečkových (nie tikových) dátach tiež
+priniesla backtesty, ktoré vyzerali pôsobivo — profit factor nad 2,
+takmer žiadny drawdown — bez permutačného testu alebo skutočného
+potvrdenia mimo vzorky za tým. Takémuto výsledku už sám o sebe
+neverím — presne preto je tento repozitár postavený tak, ako je:
+každé číslo tu musí prejsť rovnakými tromi kontrolami (či prežije
+nulové rozdelenie na premiešaných štítkoch, či drží na dátach, ktoré
+nikdy nevidel, či prežije mierne zmenené parametre) — až potom niečo
+znamená.
+
 ---
 
 ## Hlavný výsledok

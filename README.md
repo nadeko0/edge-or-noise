@@ -43,6 +43,24 @@ any of it directly — I ran every experiment here, I understand why
 each one failed or held up, and I'd rather defend a negative result
 in detail than dress up a false positive.
 
+For accuracy, since it's easy to round this up: this specific,
+rigorous, walk-forward-validated line of work is roughly **7 months**
+old (since about December 2025). Before that, starting May 2025, there
+were informal trial runs on spot trading with basic TA-Lib indicators
+— exploratory, and not held to the standard shown in this repo. I'd
+rather say that plainly than let it sound like this level of rigor
+existed for a full year when it didn't.
+
+Some of my earlier, candle-based (not tick-level) work found backtests
+that looked exciting too — profit factors above 2, barely any
+drawdown — without a permutation test or a genuine out-of-sample
+confirmation behind them. I no longer trust a result like that on its
+own, which is exactly why this repo is built the way it is: every
+number in here is required to survive the same three checks (does it
+beat a shuffled-label null, does it hold on data it never saw, does it
+survive someone changing the parameters slightly) before it gets to
+mean anything.
+
 ---
 
 ## Headline result
