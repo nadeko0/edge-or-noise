@@ -48,10 +48,11 @@ negatívny výsledok, než by som prikrášlil falošne pozitívny.
 
 ## Hlavný výsledok
 
-Bol nájdený štatisticky reálny, medzi-aktívový, medzi-ročný prediktívny
-signál — **ROC-AUC ≈ 0,58–0,67** v závislosti od horizontu predikcie
-(AUC meria schopnosť radenia: 0,5 = nie lepšie ako hod mincou, 1,0 =
-dokonalé; ide o reálnu, no skromnú výhodu, nie silnú). Je takmer úplne
+Bol nájdený štatisticky reálny prediktívny signál, konzistentný naprieč
+aktívami (cross-asset) aj naprieč rokmi (cross-year) —
+**ROC-AUC ≈ 0,58–0,67** v závislosti od horizontu predikcie (AUC meria
+schopnosť radenia: 0,5 = nie lepšie ako hod mincou, 1,0 = dokonalé; ide
+o reálnu, no skromnú výhodu, nie silnú). Je takmer úplne
 vysvetlený krátkodobým zhlukovaním volatility, nie order flow, hĺbkou
 order booku ani smerom. Žiadna z testovaných konfigurácií (~80
 hypotéz: varianty stop-lossu, 4 modelové enginy, hĺbka order booku,
@@ -84,7 +85,7 @@ Kompletné čísla: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md)
 
 Kolektor zbiera 24 symbolov, ale skutočné experimenty v tomto
 repozitári používajú iba **BTCUSDT** (hlavný, ~80 hypotéz), plus
-**ETHUSDT** a **SOLUSDT** pre medzi-aktívové kontroly na rovnakom
+**ETHUSDT** a **SOLUSDT** pre cross-asset kontroly na rovnakom
 90-dňovom živom okne. Historický archív pokrýva BTC/ETH/SOL, ale
 kontrola mimo vzorky v tomto repozitári (`experiments/06`) trénuje a
 vyhodnocuje iba na jeho **BTC** dátach — presné rozdelenie
@@ -248,6 +249,36 @@ Zhrnutie:
   týchto pákach ~0 % pre testované doby držania (1–5 minút), čo
   znamená, že páka jednoducho škáluje už existujúci výsledok; nevytvára
   výhodu a zosilňuje krehkosť marginálnych (PF ≈ 1,0–1,1) konfigurácií.
+
+---
+
+## Jeden reálny trade-off (nie inscenovaný)
+
+Tento projekt vznikol s pomocou AI asistenta pri programovaní.
+Neskrývam to — v roku 2026 veľmi nezáleží na tom, či bol kód vytvorený
+s pomocou AI; záleží na tom, či osoba za ním dokáže vysvetliť a obhájiť
+každé rozhodnutie v ňom. Toto je skutočná výmena z toho procesu,
+ponechaná tak, ako bola, pretože lepšie ilustruje podstatu než čokoľvek
+napísané dodatočne:
+
+**Otázka: replay L2 order booku trvá ~15 minút pre 90 dní BTC — je to
+limit hardvéru, alebo softvéru?**
+
+Väčšinou softvéru. Denný loader v `orderbook_l2.py` parsuje surový JSON
+riadok po riadku do obyčajného Python `dict`-based order booku —
+nedá sa vektorizovať tak ako zvyšok pipeline (numba-JIT), pretože každý
+riadok závisí od nahromadeného stavu tých predchádzajúcich. Skutočná
+oprava je jednoduchá a viem presne, aká: 90 dní sú nezávislé súbory bez
+zdieľaného stavu medzi sebou, takže ide o učebnicový prípad pre
+`multiprocessing.Pool` — paralelizácia naprieč dňami by čas na
+2-jadrovom stroji približne prepolovila, takmer zadarmo.
+
+Neurobil som to. Keď výsledok vyšiel čistý — hĺbka order booku nehýbe
+s AUC (0,597 → 0,596 → 0,594, šum) — zrýchľovanie kódu, ktorý priniesol
+nulový výsledok, prestalo stáť za ten čas. To je reálny trade-off
+("funguje a stačí to na záver" vs. "funguje rýchlo"), nie nepovšimnutý
+problém — presne tento typ rozhodnutia sa neukáže v diffe, len keď sa
+naň niekto opýta priamo.
 
 ---
 

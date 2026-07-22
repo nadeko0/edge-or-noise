@@ -242,6 +242,37 @@ Documented in full with numbers in
 
 ---
 
+## One real trade-off, not staged
+
+This project was built with an AI coding assistant. I'm not hiding
+that — it doesn't matter much in 2026 whether code was AI-assisted;
+what matters is whether the person behind it can explain and defend
+every decision in it. Here's an actual exchange from that process,
+kept because it's a better illustration of that than anything I could
+write from scratch:
+
+**Q: the L2 order-book replay takes ~15 minutes for 90 days of BTC —
+is that a hardware limit or a software one?**
+
+Mostly software. `orderbook_l2.py`'s day loader parses raw JSON
+line-by-line into a plain Python dict-based order book — it can't be
+vectorized the way the rest of the pipeline is (numba-JIT'd), because
+each line depends on the accumulated state of the ones before it. The
+actual fix is easy, and I know exactly what it is: the 90 days are
+independent files with no shared state between them, so this is a
+textbook `multiprocessing.Pool` case — parallelizing across days would
+roughly halve the time on a 2-core machine, almost for free.
+
+I didn't do it. Once the result came back clean — order-book depth
+doesn't move the AUC (0.597 → 0.596 → 0.594, noise) — speeding up the
+code that produced a null result stopped being worth the time. That's
+a real trade-off ("works and is sufficient for the conclusion" vs.
+"works fast"), not an unnoticed problem — and it's the kind of
+judgment call that doesn't show up in a diff, only in being asked
+about it directly.
+
+---
+
 ## Repository layout
 
 ```
