@@ -15,13 +15,17 @@ Nothing in it is a recommendation to trade with real capital.
 ## Headline result
 
 A statistically real, cross-asset, cross-year predictive signal was
-found (ROC-AUC ≈ 0.58–0.67 depending on the prediction horizon), but it
+found — **ROC-AUC ≈ 0.58–0.67** depending on the prediction horizon
+(AUC measures ranking ability: 0.5 = no better than a coin flip,
+1.0 = perfect; this is a real but modest edge, not a strong one). It
 is almost entirely explained by short-term realized-volatility
 clustering, not order flow, order-book depth, or direction. No tested
 configuration (~80 hypotheses: stop-loss variants, 4 model engines,
 order-book depth, technical indicators, leverage, funding rate, open
 interest, and several literal "smart money" concepts) produced a
-profit factor reliably above 1.0 on a sample large enough to trust.
+**profit factor** reliably above 1.0 (profit factor = total winning
+$ / total losing $; above 1.0 means net profitable after fees) on a
+sample large enough to trust.
 Full numbers: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md).
 
 ---
@@ -152,7 +156,9 @@ Documented in full with numbers in
   marginal improvement (+0.004 AUC), same underlying volatility story.
 - Funding-rate extremes and open-interest/price quadrants as
   contrarian signals — not statistically significant (p = 0.20 and
-  p = 0.61 respectively, permutation test).
+  p = 0.61 respectively, permutation test — the convention used
+  throughout this repo is p ≤ 0.05 to call a result significant, so
+  neither clears that bar).
 - A literal "liquidity sweep / stop hunt" rule (price wicks past a
   recent swing level with a coincident liquidation spike) — looked
   significant on 25 in-sample signals (p = 0.008) but failed a
