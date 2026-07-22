@@ -88,8 +88,9 @@ export TICKML_SFEREZ_DIR=/path/to/your/2024/historical/archive   # optional
 ## Architecture
 
 ```mermaid
-flowchart LR
-    subgraph Collection
+flowchart TD
+    subgraph Collection["Collection"]
+        direction TB
         WS["Bybit public WS<br/>(trades, liquidations,<br/>tickers, orderbook.50,<br/>orderbook.rpi)"]
         COL["collector/<br/>(async WS client,<br/>reconnect + backoff)"]
         DISK["data/*.jsonl.gz<br/>(one file per symbol per day)"]
@@ -97,17 +98,19 @@ flowchart LR
     end
 
     subgraph Research["tickml/ research pipeline"]
+        direction TB
         LOAD["loaders_live.py /<br/>loaders_sferez.py<br/>(gzip -> 1-min bars)"]
         L2["orderbook_l2.py<br/>(stateful L2 book replay,<br/>whale-wall detection)"]
         FEAT["features.py<br/>(backward-looking<br/>rolling features)"]
         LABEL["labeling.py<br/>(triple-barrier<br/>PT / SL / time-exit)"]
         MODEL["models.py<br/>(XGBoost / LightGBM /<br/>CatBoost / RandomForest)"]
         VALID["validation.py<br/>(walk-forward, purge,<br/>permutation test, OOS,<br/>equity curve)"]
+        LOAD --> FEAT
+        L2 --> FEAT
+        FEAT --> LABEL --> MODEL --> VALID
     end
 
-    DISK --> LOAD --> FEAT
-    DISK --> L2 --> FEAT
-    FEAT --> LABEL --> MODEL --> VALID
+    Collection --> Research
     VALID --> REPORT["reports/FINAL_REPORT.md"]
 ```
 
