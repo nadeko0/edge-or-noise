@@ -12,6 +12,26 @@ Nothing in it is a recommendation to trade with real capital.
 
 ---
 
+## Why this exists
+
+I went looking for a short-horizon scalping edge in tick data because
+I wanted to believe order flow and order-book depth held something a
+slower, candle-based strategy couldn't see. They don't — not in this
+data, not after roughly 80 honestly-tested hypotheses. I'd rather
+publish that plainly than quietly bury the negative result and only
+show the parts that look good.
+
+What's in this repo is the actual trail: the off-by-one I found and
+fixed in my own validation code, the configuration that looked
+excellent on 17 trades and fell apart on 2,000 once tested properly,
+the four model engines that all agreed with each other (which is its
+own kind of answer). If you're reviewing this for a role, ask me about
+any of it directly — I ran every experiment here, I understand why
+each one failed or held up, and I'd rather defend a negative result
+in detail than dress up a false positive.
+
+---
+
 ## Headline result
 
 A statistically real, cross-asset, cross-year predictive signal was
