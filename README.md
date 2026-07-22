@@ -62,11 +62,13 @@ sample large enough to trust.
 Full numbers: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md).
 
 <p align="center">
-  <img src="figures/permutation_test.png" width="90%" alt="Observed AUC plotted against a null distribution built from 60 label-shuffled runs — the real result sits far outside where random labels land.">
+  <img src="figures/permutation_test.png" width="85%" alt="Observed AUC plotted against a null distribution built from 60 label-shuffled runs — the real result sits far outside where random labels land.">
 </p>
 <p align="center">
-  <img src="figures/auc_by_horizon.png" width="49%" alt="Bar chart: ROC-AUC decreases from 0.669 at a 1-minute horizon down to 0.580 at a 10-minute horizon.">
-  <img src="figures/feature_importance.png" width="49%" alt="Horizontal bar chart of XGBoost feature importances: rolling realized volatility and bar range dominate; order-flow features rank near the bottom.">
+  <img src="figures/auc_by_horizon.png" width="85%" alt="Bar chart: ROC-AUC decreases from 0.669 at a 1-minute horizon down to 0.580 at a 10-minute horizon.">
+</p>
+<p align="center">
+  <img src="figures/feature_importance.png" width="85%" alt="Horizontal bar chart of XGBoost feature importances: rolling realized volatility and bar range dominate; order-flow features rank near the bottom.">
 </p>
 
 ---

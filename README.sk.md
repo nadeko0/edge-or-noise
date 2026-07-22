@@ -64,11 +64,13 @@ Kompletné čísla: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md)
 (v angličtine).
 
 <p align="center">
-  <img src="figures/permutation_test.png" width="90%" alt="Pozorované AUC vynesené oproti nulovému rozdeleniu z 60 behov s premiešanými štítkami — reálny výsledok leží ďaleko mimo miesta, kam sa dostávajú náhodné štítky.">
+  <img src="figures/permutation_test.png" width="85%" alt="Pozorované AUC vynesené oproti nulovému rozdeleniu z 60 behov s premiešanými štítkami — reálny výsledok leží ďaleko mimo miesta, kam sa dostávajú náhodné štítky.">
 </p>
 <p align="center">
-  <img src="figures/auc_by_horizon.png" width="49%" alt="Stĺpcový graf: ROC-AUC klesá z 0,669 pri 1-minútovom horizonte na 0,580 pri 10-minútovom horizonte.">
-  <img src="figures/feature_importance.png" width="49%" alt="Horizontálny stĺpcový graf dôležitosti príznakov XGBoost: dominuje kĺzavá realizovaná volatilita a rozsah baru; príznaky order flow sú takmer na dne.">
+  <img src="figures/auc_by_horizon.png" width="85%" alt="Stĺpcový graf: ROC-AUC klesá z 0,669 pri 1-minútovom horizonte na 0,580 pri 10-minútovom horizonte.">
+</p>
+<p align="center">
+  <img src="figures/feature_importance.png" width="85%" alt="Horizontálny stĺpcový graf dôležitosti príznakov XGBoost: dominuje kĺzavá realizovaná volatilita a rozsah baru; príznaky order flow sú takmer na dne.">
 </p>
 
 ---
