@@ -1,5 +1,5 @@
 [project]
-name = "tick-ml-research"
+name = "edge-or-noise"
 version = "0.1.0"
 description = "Research repo: does ML find a tradeable scalping edge in Bybit perpetual-futures tick data?"
 readme = "README.md"
