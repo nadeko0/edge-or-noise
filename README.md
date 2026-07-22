@@ -10,6 +10,17 @@ scope here?
 documents a methodology and its results, including negative results.
 Nothing in it is a recommendation to trade with real capital.
 
+**What this demonstrates, if you're skimming for skills rather than
+results:** an asynchronous WebSocket data collector (`asyncio`/
+`websockets`, reconnect/backoff, daily-rotating compressed storage); a
+data pipeline (Polars/Pandas/NumPy/Numba) processing tens of millions
+of rows per symbol; rigorous ML validation (chronological walk-forward
+with a purge gap, permutation testing, confirmation on an independent
+year of out-of-sample data); statistical awareness of false positives
+rather than reporting the first good-looking backtest; and a modular,
+tested (`pytest`), dependency-locked (`uv`) codebase with data
+collection kept separate from research code.
+
 ---
 
 ## Why this exists
