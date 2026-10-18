@@ -1,4 +1,6 @@
-# tick-ml-research
+# edge-or-noise
+
+[![tests](https://github.com/nadeko0/edge-or-noise/actions/workflows/tests.yml/badge.svg)](https://github.com/nadeko0/edge-or-noise/actions/workflows/tests.yml)
 
 *English · [Русский](README.ru.md) · [Slovenčina](README.sk.md)*
 
@@ -91,6 +93,10 @@ PF > 1 on a sample of 200+ trades (eight cells at PF 0.64–0.82; the one
 above 1 has 10 trades, the same small-sample trap as before). Same
 pass also found and fixed a bug in the order-book reader (see below).
 Details: [`FINAL_REPORT.md` §10](reports/FINAL_REPORT.md#10-forward-test-2026-10-18).
+
+<p align="center">
+  <img src="figures/forward_test.png" width="85%" alt="Grouped bar chart: ROC-AUC by prediction horizon, original walk-forward vs. the frozen model on 89 unseen days; the forward bars are higher at every horizon, from 0.722 at 1 minute to 0.619 at 10 minutes.">
+</p>
 
 <p align="center">
   <img src="figures/permutation_test.png" width="85%" alt="Observed AUC plotted against a null distribution built from 60 label-shuffled runs — the real result sits far outside where random labels land.">
@@ -318,6 +324,34 @@ more look at the data first.
 
 ---
 
+## Limitations
+
+Stated plainly, because a negative result is only as good as the
+conditions it was tested under:
+
+- **Optimistic fill and fee model.** Entry at the next bar's open is in
+  practice a market (taker) order, but fees are modeled at the maker
+  rate (0.04% round-trip), with no slippage. A realistic model would
+  make every result here worse, not better.
+- **Mostly one symbol.** The ~80-hypothesis battery ran on BTCUSDT;
+  ETH and SOL only in cross-asset checks. The other 21 collected
+  symbols were not tested.
+- **Multiple comparisons.** The original study tested ~80 hypotheses
+  without a formal family-wise correction. It relies on permutation
+  tests, an independent year and the forward test instead (the
+  forward test does use Bonferroni). Read single p-values in the
+  report with that in mind.
+- **One venue, short history.** Bybit only, about six months of 2026
+  plus a 2024 archive for BTC. Other regimes and exchanges may differ.
+- **1-minute bars.** Sub-minute dynamics (queue position, latency) are
+  not modeled; the order book is sampled as ~0.5 s snapshots, and the
+  collector stores exchange timestamps only, no local receive time.
+- **Data is not shipped.** Outsiders can rerun the code on their own
+  data, and the synthetic check below verifies the code path, but the
+  exact numbers here cannot be reproduced without this dataset.
+
+---
+
 ## Repository layout
 
 ```
@@ -326,9 +360,25 @@ collector/             Bybit WS collector that produced the live dataset (see Da
 experiments/           runnable scripts, each testing one group of hypotheses
 tests/                 correctness tests (no-lookahead checks, labeling edge cases, validation math)
 reports/FINAL_REPORT.md   full numeric writeup
+reports/runs/          raw console output of the 2026-10 reruns
+figures/               PNGs embedded in this README
+.github/workflows/     CI: the test suite on every push
 ```
 
 ## Running
+
+Without any data, the whole pipeline runs on synthetic ticks: one world
+with planted volatility clustering, one with constant volatility. It
+should find the first (AUC 0.54–0.62 over six seeds) and nothing in the
+second (0.50–0.53); the
+same check runs in CI (`tests/test_synthetic_pipeline.py`).
+
+```bash
+uv sync
+uv run experiments/00_synthetic_smoke.py
+```
+
+With your own data:
 
 ```bash
 uv sync
@@ -341,5 +391,6 @@ Each `experiments/*.py` file is independently runnable and prints its
 own results; none require the others to have run first (aside from a
 local parquet cache written to `.cache/` on first load of a given
 symbol, to avoid re-parsing gigabytes of gzip on every run).
-`experiments/08_make_figures.py` regenerates the 3 PNGs embedded above
-into `figures/`.
+`experiments/08_make_figures.py` regenerates the 3 original-study PNGs
+embedded above into `figures/`; `experiments/10_forward_figure.py`
+regenerates `forward_test.png`.

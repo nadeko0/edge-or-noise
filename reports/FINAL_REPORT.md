@@ -44,6 +44,9 @@ clustering, not order flow, order-book depth, or direction. No tested
 configuration produced a profit factor reliably above 1.0 on a sample
 large enough to trust.
 
+A forward test on 89 later days the model never saw (§10) confirmed
+every one of these claims, with criteria fixed before the run.
+
 ---
 
 ## 1. Methodology
@@ -107,6 +110,13 @@ large enough to trust.
   number of trees. Redoing the same folds with the last 5% of the
   training window as the early-stopping set: AUC 0.5964 vs 0.5970
   published. Negligible, but the forward test in §10 avoids it.
+- Added 2026-10: an end-to-end check on synthetic ticks
+  (`tickml/synthetic.py`, `tests/test_synthetic_pipeline.py`, runs in
+  CI). The full pipeline must find a planted volatility-regime signal
+  (walk-forward AUC 0.54-0.62 over the six seeds of `experiments/00`)
+  and must not find one in a constant-volatility world (0.50-0.53,
+  same seeds). A pipeline leaking future
+  information would score well above 0.5 on the second.
 
 ## 3. Core finding: horizon and direction
 
@@ -251,7 +261,8 @@ by chance alone is the expected outcome, not evidence of an edge.
 
 The predictive signal found here is real and reproducible: it survives
 a label-shuffle permutation test (p=0.0000, real AUC above all 15
-null-distribution runs), generalizes across BTC/ETH/SOL, and holds up
+null-distribution runs in `experiments/07`; the README figure from
+`experiments/08` uses 60 runs, same outcome), generalizes across BTC/ETH/SOL, and holds up
 on an independent year of data. It is best characterized as short-term
 realized-volatility clustering — a well-documented statistical
 property of financial time series — rather than an order-flow,
@@ -312,3 +323,25 @@ not "profitable"):
 The one cell above PF 1 (10 trades) is the same small-sample pattern as
 §8, which collapsed on a larger sample. The two §8 configs themselves
 (max_bars=3 thr=0.60, max_bars=1 thr=0.50) score PF 0.80 and 0.64 here.
+
+## 11. Limitations
+
+- **Optimistic fill and fee model.** Entry at the next bar's open is in
+  practice a market (taker) order, but fees are modeled at the maker
+  rate (0.04% round-trip), with no slippage. A realistic model would
+  make every profitability number in this report worse, not better.
+- **Mostly one symbol.** The ~80-hypothesis battery ran on BTCUSDT;
+  ETH and SOL only in cross-asset checks. The other 21 collected
+  symbols were not tested.
+- **Multiple comparisons.** Sections 3-8 report ~80 hypotheses without
+  a formal family-wise correction. The safeguards are the permutation
+  tests, the independent 2024 year and the forward test (§10, which
+  uses Bonferroni). Single p-values in those sections should be read
+  with that in mind.
+- **One venue, short history.** Bybit only, about six months of 2026
+  plus a 2024 archive for BTC.
+- **1-minute bars.** Sub-minute dynamics (queue position, latency) are
+  not modeled; the order book is sampled as ~0.5 s snapshots, and the
+  collector stores exchange timestamps only, no local receive time.
+- **Data is not shipped.** The synthetic check verifies the code path;
+  the exact numbers here need this dataset to reproduce.

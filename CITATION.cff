@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you reference this research, please cite it as below."
+title: "edge-or-noise: testing for a tick-level scalping edge in Bybit perpetual futures"
+type: software
+authors:
+  - alias: nadeko0
+repository-code: "https://github.com/nadeko0/edge-or-noise"
+license: MIT
+date-released: "2026-10-18"
+keywords:
+  - market microstructure
+  - machine learning
+  - walk-forward validation
+  - negative result

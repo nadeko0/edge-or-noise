@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import gzip
 import json
+from pathlib import Path
 
 import pandas as pd
 import polars as pl
@@ -37,10 +38,10 @@ def _read_ndjson_gz_safe(path, schema):
         return pl.DataFrame(rows, schema=schema)
 
 
-def load_trade_bars(sym: str, dates: list[str]) -> pl.DataFrame | None:
+def load_trade_bars(sym: str, dates: list[str], data_dir: Path = DATA_DIR) -> pl.DataFrame | None:
     frames = []
     for d in dates:
-        p = DATA_DIR / "trades" / f"{sym}_{d}.jsonl.gz"
+        p = data_dir / "trades" / f"{sym}_{d}.jsonl.gz"
         if not p.exists():
             continue
         df = _read_ndjson_gz_safe(p, schema={"T": pl.Int64, "s": pl.Utf8, "S": pl.Utf8,
@@ -64,10 +65,10 @@ def load_trade_bars(sym: str, dates: list[str]) -> pl.DataFrame | None:
     return pl.concat(frames).sort("bucket") if frames else None
 
 
-def load_liquidation_bars(sym: str, dates: list[str]) -> pl.DataFrame:
+def load_liquidation_bars(sym: str, dates: list[str], data_dir: Path = DATA_DIR) -> pl.DataFrame:
     frames = []
     for d in dates:
-        p = DATA_DIR / "liquidations" / f"all_{d}.jsonl.gz"
+        p = data_dir / "liquidations" / f"all_{d}.jsonl.gz"
         if not p.exists():
             continue
         df = _read_ndjson_gz_safe(p, schema={"T": pl.Int64, "s": pl.Utf8, "S": pl.Utf8,
@@ -92,10 +93,10 @@ def load_liquidation_bars(sym: str, dates: list[str]) -> pl.DataFrame:
     return pl.concat(frames).sort("bucket")
 
 
-def load_ticker_bars(sym: str, dates: list[str]) -> pl.DataFrame:
+def load_ticker_bars(sym: str, dates: list[str], data_dir: Path = DATA_DIR) -> pl.DataFrame:
     frames = []
     for d in dates:
-        p = DATA_DIR / "tickers" / f"{sym}_{d}.jsonl.gz"
+        p = data_dir / "tickers" / f"{sym}_{d}.jsonl.gz"
         if not p.exists():
             continue
         df = _read_ndjson_gz_safe(p, schema={"T": pl.Int64, "bid": pl.Utf8, "bsz": pl.Utf8,
@@ -124,13 +125,13 @@ def load_ticker_bars(sym: str, dates: list[str]) -> pl.DataFrame:
     return pl.concat(frames).sort("bucket")
 
 
-def build_bar_dataset(sym: str, dates: list[str]) -> pd.DataFrame:
+def build_bar_dataset(sym: str, dates: list[str], data_dir: Path = DATA_DIR) -> pd.DataFrame:
     """Joins trades/liquidations/tickers into one 1-minute bar table."""
-    trade_bars = load_trade_bars(sym, dates)
+    trade_bars = load_trade_bars(sym, dates, data_dir)
     if trade_bars is None:
         raise RuntimeError(f"no trade data found for {sym} in the given date range")
-    liq_bars = load_liquidation_bars(sym, dates)
-    tick_bars = load_ticker_bars(sym, dates)
+    liq_bars = load_liquidation_bars(sym, dates, data_dir)
+    tick_bars = load_ticker_bars(sym, dates, data_dir)
 
     df = trade_bars.join(liq_bars, on="bucket", how="left") \
                     .join(tick_bars, on="bucket", how="left") \

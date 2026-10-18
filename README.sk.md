@@ -1,4 +1,6 @@
-# tick-ml-research
+# edge-or-noise
+
+[![tests](https://github.com/nadeko0/edge-or-noise/actions/workflows/tests.yml/badge.svg)](https://github.com/nadeko0/edge-or-noise/actions/workflows/tests.yml)
 
 *[English](README.md) · [Русский](README.ru.md) · Slovenčina*
 
@@ -95,6 +97,10 @@ pravidiel nedosiahlo PF > 1 na vzorke 200+ obchodov (osem buniek s PF
 predtým). Pri tom sa našla a opravila chyba v čítaní order booku
 (pozri nižšie).
 Podrobnosti: [`FINAL_REPORT.md` §10](reports/FINAL_REPORT.md#10-forward-test-2026-10-18).
+
+<p align="center">
+  <img src="figures/forward_test.png" width="85%" alt="Zoskupený stĺpcový graf: ROC-AUC podľa horizontu predikcie, pôvodný walk-forward oproti zmrazenému modelu na 89 nevidených dňoch; forward stĺpce sú vyššie pri každom horizonte, od 0,722 pri 1 minúte po 0,619 pri 10 minútach.">
+</p>
 
 <p align="center">
   <img src="figures/permutation_test.png" width="85%" alt="Pozorované AUC vynesené oproti nulovému rozdeleniu z 60 behov s premiešanými štítkami — reálny výsledok leží ďaleko mimo miesta, kam sa dostávajú náhodné štítky.">
@@ -327,6 +333,36 @@ overiť na dátach.
 
 ---
 
+## Obmedzenia
+
+Priamo, pretože negatívny výsledok má len takú hodnotu ako podmienky,
+za ktorých bol testovaný:
+
+- **Optimistický model plnenia a poplatkov.** Vstup na otvorení
+  nasledujúcej sviečky je v praxi trhový (taker) príkaz, no poplatky sú
+  modelované maker sadzbou (0,04 % za kruh), bez sklzu. Realistický
+  model by každý výsledok tu zhoršil, nie zlepšil.
+- **Prevažne jeden symbol.** Batéria ~80 hypotéz bežala na BTCUSDT;
+  ETH a SOL len v cross-asset kontrolách. Ostatných 21 zbieraných
+  symbolov testovaných nebolo.
+- **Viacnásobné porovnania.** Pôvodná štúdia testovala ~80 hypotéz bez
+  formálnej korekcie na viacnásobné porovnania. Namiesto nej sa opiera
+  o permutačné testy, nezávislý rok a forward test (forward test
+  Bonferroniho korekciu používa). Jednotlivé p-hodnoty v reporte treba
+  čítať s týmto vedomím.
+- **Jedna burza, krátka história.** Iba Bybit, približne pol roka 2026
+  plus archív z roku 2024 pre BTC. V iných režimoch a na iných burzách
+  to môže byť inak.
+- **Minútové sviečky.** Dynamika v rámci minúty (pozícia vo fronte,
+  latencia) nie je modelovaná; order book je vzorkovaný ako snímky
+  každých ~0,5 s a kolektor ukladá iba časové pečiatky burzy, bez
+  lokálneho času prijatia.
+- **Dáta nie sú súčasťou repozitára.** Ktokoľvek môže spustiť kód na
+  vlastných dátach a syntetická kontrola nižšie overí, že kód funguje,
+  no presné čísla tu bez tohto datasetu reprodukovať nejde.
+
+---
+
 ## Štruktúra repozitára
 
 ```
@@ -335,9 +371,24 @@ collector/             WS kolektor Bybit, ktorý zozbieral živý dataset (pozri
 experiments/           spustiteľné skripty, každý testuje jednu skupinu hypotéz
 tests/                 testy správnosti (kontroly look-aheadu, hraničné prípady označovania, matematika validácie)
 reports/FINAL_REPORT.md   kompletný číselný prehľad (v angličtine)
+reports/runs/          surový výstup opakovaných behov z 2026-10
+figures/               PNG obrázky vložené v tomto README
+.github/workflows/     CI: testy pri každom pushi
 ```
 
 ## Spustenie
+
+Bez akýchkoľvek dát beží celý pipeline na syntetických tikoch: jeden
+svet so zabudovaným zhlukovaním volatility, druhý s konštantnou
+volatilitou. Pipeline by mal nájsť to prvé (AUC 0,54–0,62 pri šiestich
+seedoch) a v druhom nič (0,50–0,53); rovnaká kontrola beží v CI (`tests/test_synthetic_pipeline.py`).
+
+```bash
+uv sync
+uv run experiments/00_synthetic_smoke.py
+```
+
+S vlastnými dátami:
 
 ```bash
 uv sync
@@ -351,4 +402,5 @@ vlastné výsledky; žiadny nevyžaduje, aby predtým bežali ostatné (okrem
 lokálnej parquet cache v `.cache/`, ktorá sa zapíše pri prvom načítaní
 symbolu, aby sa gigabajty gzipu neparsovali znova pri každom spustení).
 `experiments/08_make_figures.py` znovu vygeneruje 3 PNG obrázky
-vložené vyššie do `figures/`.
+pôvodnej štúdie do `figures/`; `experiments/10_forward_figure.py`
+znovu vygeneruje `forward_test.png`.
