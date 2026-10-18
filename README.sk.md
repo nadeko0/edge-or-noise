@@ -82,6 +82,20 @@ vzorke dostatočne veľkej na to, aby sa jej dalo veriť.
 Kompletné čísla: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md)
 (v angličtine).
 
+**Forward test, 2026-10-18.** Kolektor bežal ďalej, takže pôvodný model
+bol zmrazený a raz vyhodnotený na 89 neskorších dňoch
+(2026-07-21 → 2026-10-17), na ktorých sa v tomto repozitári nič
+neladilo. Kritériá úspechu a neúspechu boli stanovené pred spustením
+([`experiments/09_forward_test.py`](experiments/09_forward_test.py)).
+Všetko platí: AUC 0,640 pri 5-minútovom horizonte (maximum pri
+premiešaných označeniach 0,541), samotná realizovaná volatilita dáva 99 %
+z toho, model BTC na ETH 0,591 / SOL 0,577 a žiadne z 9 prahových
+pravidiel nedosiahlo PF > 1 na vzorke 200+ obchodov (osem buniek s PF
+0,64–0,82; jediná nad 1 má 10 obchodov, rovnaká pasca malej vzorky ako
+predtým). Pri tom sa našla a opravila chyba v čítaní order booku
+(pozri nižšie).
+Podrobnosti: [`FINAL_REPORT.md` §10](reports/FINAL_REPORT.md#10-forward-test-2026-10-18).
+
 <p align="center">
   <img src="figures/permutation_test.png" width="85%" alt="Pozorované AUC vynesené oproti nulovému rozdeleniu z 60 behov s premiešanými štítkami — reálny výsledok leží ďaleko mimo miesta, kam sa dostávajú náhodné štítky.">
 </p>
@@ -98,7 +112,8 @@ Kompletné čísla: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md)
 
 | Zdroj | Kto zbieral | Zbierané symboly | Obdobie | Súčasť repozitára? |
 |---|---|---|---|---|
-| Živé tikové dáta (obchody, order book, likvidácie, tickers/funding/OI) | Vlastný WS kolektor tohto projektu (`collector/`) | 24 perpetuálnych kontraktov Bybit (USDT) | 2026-04-22 → 2026-07-20 (90 dní) | Nie — surové dáta majú ~100 GB, sú v .gitignore |
+| Živé tikové dáta (obchody, order book, likvidácie, tickers/funding/OI) | Vlastný WS kolektor tohto projektu (`collector/`) | 24 perpetuálnych kontraktov Bybit (USDT) | 2026-04-22 → 2026-07-20 (90 dní, pôvodná štúdia) | Nie — surové dáta majú ~100 GB, sú v .gitignore |
+| Ten istý kolektor, neskoršie dáta (iba forward test) | ten istý | tie isté (26 približne od 2026-09-30) | 2026-07-21 → 2026-10-17 (89 dní) | Nie |
 | Historické tikové dáta (kontrola mimo vzorky) | Archív tretej strany nájdený online (nezbieral tento projekt) | BTC, ETH, SOL | 2024-02-12 → 2024-06-02 (112 dní) | Nie — nie je možné ho ďalej šíriť |
 
 Kolektor zbiera 24 symbolov, ale skutočné experimenty v tomto
@@ -157,7 +172,7 @@ flowchart TD
     subgraph Research["tickml/ výskumný pipeline"]
         direction TB
         LOAD["loaders_live.py /<br/>loaders_sferez.py<br/>(gzip -> 1-min bary)"]
-        L2["orderbook_l2.py<br/>(stavový replay L2 order booku,<br/>detekcia whale-wall)"]
+        L2["orderbook_l2.py<br/>(snímky L2 order booku,<br/>detekcia whale-wall)"]
         FEAT["features.py<br/>(príznaky založené len<br/>na minulých dátach)"]
         LABEL["labeling.py<br/>(triple-barrier<br/>PT / SL / time-exit)"]
         MODEL["models.py<br/>(XGBoost / LightGBM /<br/>CatBoost / RandomForest)"]
@@ -240,11 +255,15 @@ Zhrnutie:
   zlepšenie, v niekoľkých prípadoch horšie než bez stop-lossu vôbec.
 - Smer obchodu (long vs. short) — štatisticky identické, dôkaz, že
   signál nie je smerový.
-- Hĺbka order booku nad rámec top-of-book, rekonštruovaná zo surových
-  L2 delt, vrátane explicitného príznaku "whale wall" (neprimerane
+- Hĺbka order booku nad rámec top-of-book, zo snímok order booku s 50
+  úrovňami, vrátane explicitného príznaku "whale wall" (neprimerane
   veľká jednotlivá objednávka) — žiadny merateľný efekt, potvrdené
   na celom 90-dňovom okne aj na obmedzenom okne s jednotnou schémou
-  (pozri nižšie).
+  (pozri nižšie). Oprava (2026-10): pôvodná verzia čítala tieto snímky
+  ako delty, čo viedlo k neplatným príznakom hĺbky (order book
+  prekrížený v každej vzorke). Po oprave je výsledok rovnaký, na
+  pôvodnom okne aj na 89-dňovom forward okne
+  ([report §2, §4](reports/FINAL_REPORT.md#2-bug-audit)).
 - 4 modelové enginy (XGBoost, LightGBM, CatBoost, RandomForest) —
   zameniteľné výsledky.
 - Kompletná klasická knižnica technických indikátorov (RSI, MACD,
@@ -298,12 +317,20 @@ nulový výsledok, prestalo stáť za ten čas. To je reálny trade-off
 problém — presne tento typ rozhodnutia sa neukáže v diffe, len keď sa
 naň niekto opýta priamo.
 
+**Dodatok, 2026-10.** Východisko tejto odpovede bolo nesprávne. Každý
+riadok v súboroch order booku je celý order book s 50 úrovňami, nie
+delta, takže žiadny riadok nezávisí od predchádzajúcich. Práve čítanie
+ako delt pokazilo príznaky hĺbky. Oprava urobila čítanie správnym aj
+bezstavovým. Samotný trade-off ako rozhodnutie platí ďalej; je to
+pripomienka, že „viem presne, aká je oprava" si zaslúžilo ešte raz
+overiť na dátach.
+
 ---
 
 ## Štruktúra repozitára
 
 ```
-tickml/               hlavný balík: označovanie, príznaky, loadery, modely, validácia, replay L2 order booku
+tickml/               hlavný balík: označovanie, príznaky, loadery, modely, validácia, príznaky L2 order booku
 collector/             WS kolektor Bybit, ktorý zozbieral živý dataset (pozri sekciu Dáta)
 experiments/           spustiteľné skripty, každý testuje jednu skupinu hypotéz
 tests/                 testy správnosti (kontroly look-aheadu, hraničné prípady označovania, matematika validácie)

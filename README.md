@@ -79,6 +79,19 @@ $ / total losing $; above 1.0 means net profitable after fees) on a
 sample large enough to trust.
 Full numbers: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md).
 
+**Forward test, 2026-10-18.** The collector kept running, so the
+original model was frozen and scored once on 89 later days
+(2026-07-21 → 2026-10-17) that nothing in this repo was tuned on, with
+pass/fail criteria fixed before the run
+([`experiments/09_forward_test.py`](experiments/09_forward_test.py)).
+Everything held: AUC 0.640 at the 5-minute horizon (shuffled-label
+max 0.541), realized volatility alone gives 99% of it, ETH 0.591 /
+SOL 0.577 with the BTC model, and 0 of 9 threshold rules reached
+PF > 1 on a sample of 200+ trades (eight cells at PF 0.64–0.82; the one
+above 1 has 10 trades, the same small-sample trap as before). Same
+pass also found and fixed a bug in the order-book reader (see below).
+Details: [`FINAL_REPORT.md` §10](reports/FINAL_REPORT.md#10-forward-test-2026-10-18).
+
 <p align="center">
   <img src="figures/permutation_test.png" width="85%" alt="Observed AUC plotted against a null distribution built from 60 label-shuffled runs — the real result sits far outside where random labels land.">
 </p>
@@ -95,7 +108,8 @@ Full numbers: [`reports/FINAL_REPORT.md`](reports/FINAL_REPORT.md).
 
 | Source | Collected by | Symbols collected | Period | Included in repo? |
 |---|---|---|---|---|
-| Live tick data (trades, order book, liquidations, tickers/funding/OI) | This project's own WS collector (`collector/`) | 24 Bybit USDT perpetuals | 2026-04-22 → 2026-07-20 (90 days) | No — raw data is ~100 GB, gitignored |
+| Live tick data (trades, order book, liquidations, tickers/funding/OI) | This project's own WS collector (`collector/`) | 24 Bybit USDT perpetuals | 2026-04-22 → 2026-07-20 (90 days, original study) | No — raw data is ~100 GB, gitignored |
+| Same collector, later data (forward test only) | same | same (26 from ~2026-09-30) | 2026-07-21 → 2026-10-17 (89 days) | No |
 | Historical tick data (out-of-sample check) | Third-party archive found online (not collected by this project) | BTC, ETH, SOL | 2024-02-12 → 2024-06-02 (112 days) | No — not redistributable |
 
 The collector captures 24 symbols, but the actual experiments here
@@ -151,7 +165,7 @@ flowchart TD
     subgraph Research["tickml/ research pipeline"]
         direction TB
         LOAD["loaders_live.py /<br/>loaders_sferez.py<br/>(gzip -> 1-min bars)"]
-        L2["orderbook_l2.py<br/>(stateful L2 book replay,<br/>whale-wall detection)"]
+        L2["orderbook_l2.py<br/>(L2 book snapshots,<br/>whale-wall detection)"]
         FEAT["features.py<br/>(backward-looking<br/>rolling features)"]
         LABEL["labeling.py<br/>(triple-barrier<br/>PT / SL / time-exit)"]
         MODEL["models.py<br/>(XGBoost / LightGBM /<br/>CatBoost / RandomForest)"]
@@ -230,10 +244,15 @@ Documented in full with numbers in
   in several cases worse than no stop-loss at all.
 - Trade direction (long vs. short) — statistically identical, evidence
   the signal is not directional.
-- Order-book depth beyond top-of-book, replayed from raw L2 deltas,
+- Order-book depth beyond top-of-book, from 50-level book snapshots,
   including an explicit "whale wall" (anomalously large single resting
   order) feature — no measurable effect, confirmed both on the full
   90-day window and on a restricted single-schema window (see below).
+  Correction (2026-10): the originally published version read those
+  snapshots as deltas, which produced invalid depth features (a book
+  crossed in every sample). After the fix the result is the same, on
+  the original window and on the 89-day forward window
+  ([report §2, §4](reports/FINAL_REPORT.md#2-bug-audit)).
 - 4 model engines (XGBoost, LightGBM, CatBoost, RandomForest) —
   interchangeable results.
 - A full classical technical-indicator library (RSI, MACD, Bollinger,
@@ -289,12 +308,20 @@ a real trade-off ("works and is sufficient for the conclusion" vs.
 judgment call that doesn't show up in a diff, only in being asked
 about it directly.
 
+**Postscript, 2026-10.** The premise of that answer was wrong. Each
+line in the order-book files is the whole 50-level book, not a delta,
+so no line depends on the ones before it. Treating them as deltas was
+also what corrupted the depth features. The fix made the reader both
+correct and stateless. The trade-off still stands as a judgment call;
+this is a reminder that "I know exactly what the fix is" deserved one
+more look at the data first.
+
 ---
 
 ## Repository layout
 
 ```
-tickml/               core package: labeling, features, loaders, models, validation, L2 book replay
+tickml/               core package: labeling, features, loaders, models, validation, L2 book features
 collector/             Bybit WS collector that produced the live dataset (see Data section)
 experiments/           runnable scripts, each testing one group of hypotheses
 tests/                 correctness tests (no-lookahead checks, labeling edge cases, validation math)

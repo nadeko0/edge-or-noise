@@ -1,0 +1,39 @@
+BTCUSDT: 256,956 bars, short days (<1380 bars) dropped: [('2026-04-22', 646)], missing days: []
+
+== 0. early-stopping audit (original 90 days only) ==
+published (early stop on test fold): AUC=0.5970
+clean (early stop on train tail):    AUC=0.5964  folds=[0.5789, 0.592, 0.6182]
+
+== C1/C2. frozen BTC model, forward AUC by horizon ==
+MaxBars= 1: train n=128,136  fwd n=128,171  fwd AUC=0.7225  fwd base_PF=0.106
+MaxBars= 2: train n=128,135  fwd n=128,171  fwd AUC=0.6807  fwd base_PF=0.188
+MaxBars= 3: train n=128,134  fwd n=128,171  fwd AUC=0.6607  fwd base_PF=0.244
+MaxBars= 5: train n=128,132  fwd n=128,171  fwd AUC=0.6397  fwd base_PF=0.323
+MaxBars=10: train n=128,127  fwd n=128,171  fwd AUC=0.6185  fwd base_PF=0.435
+null (label-shuffled, 15 runs): mean=0.5011 max=0.5413  p=0.0000
+
+== C3. is it still volatility? (MaxBars=5) ==
+logistic(vol_20):  fwd AUC=0.6340  (99.1% of XGBoost)
+logistic(all 21):  fwd AUC=0.6384
+
+== C4. threshold rules on the forward window (9 cells, Bonferroni alpha=0.0056) ==
+MaxBars=1 thr=0.50: n=118  PF=0.638  p=0.0000  null_median=0.095  | sequential: trades=118 PF=0.638 ret=-3.72% maxDD=4.88%
+MaxBars=1 thr=0.55: n=40  PF=0.658  p=0.0010  null_median=0.086  | sequential: trades=40 PF=0.658 ret=-1.36% maxDD=2.26%
+MaxBars=1 thr=0.60: n=10  PF=2.142  p=0.0010  null_median=0.050  | sequential: trades=10 PF=2.142 ret=0.51% maxDD=0.35%
+MaxBars=3 thr=0.50: n=884  PF=0.780  p=0.0000  null_median=0.237  | sequential: trades=439 PF=0.742 ret=-9.86% maxDD=11.06%
+MaxBars=3 thr=0.55: n=395  PF=0.769  p=0.0000  null_median=0.237  | sequential: trades=199 PF=0.736 ret=-5.38% maxDD=6.55%
+MaxBars=3 thr=0.60: n=147  PF=0.797  p=0.0010  null_median=0.234  | sequential: trades=83 PF=0.893 ret=-0.89% maxDD=3.32%
+MaxBars=5 thr=0.50: n=2,221  PF=0.700  p=0.0000  null_median=0.319  | sequential: trades=822 PF=0.696 ret=-21.82% maxDD=21.95%
+MaxBars=5 thr=0.55: n=970  PF=0.793  p=0.0000  null_median=0.320  | sequential: trades=387 PF=0.857 ret=-5.62% maxDD=7.36%
+MaxBars=5 thr=0.60: n=500  PF=0.816  p=0.0000  null_median=0.316  | sequential: trades=215 PF=0.871 ret=-3.04% maxDD=4.97%
+
+== C5. BTC-trained model scored on ETH / SOL forward ==
+ETHUSDT: 256,954 bars, short days (<1380 bars) dropped: [('2026-04-22', 645)], missing days: []
+ETHUSDT: fwd n=128,167  AUC=0.5914  base_PF=0.409
+SOLUSDT: 256,932 bars, short days (<1380 bars) dropped: [('2026-04-22', 646)], missing days: []
+SOLUSDT: fwd n=128,156  AUC=0.5765  base_PF=0.475
+
+== C6. order-book depth, corrected reader (BTC) ==
+baseline     : train n=115,180  fwd n=128,171  fwd AUC=0.6393
++ depth      : train n=115,180  fwd n=128,171  fwd AUC=0.6413
++ whale wall : train n=115,180  fwd n=128,171  fwd AUC=0.6386

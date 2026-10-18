@@ -1,20 +1,20 @@
-"""Stateful L2 order-book replay from data/orderbook/ (raw 50-level
-deltas), plus a 'whale wall' feature (an anomalously large single
-resting order relative to its neighbors).
+"""Per-minute L2 order-book features from data/orderbook/, plus a
+'whale wall' feature (an anomalously large single resting order
+relative to its neighbors).
 
 Two schemas exist in this project's own collected data, because the
 collector's orderbook capture was upgraded partway through collection:
   - early days: a pre-aggregated {T, bid5, ask5, imb, mid, spd} snapshot
     (top-5-level size sums and imbalance already computed)
-  - later days: raw 50-level deltas {T, b:[[price,size],...], a:[...]}
-    that must be replayed into a running book
+  - later days: full 50-level book snapshots {T, b:[[price,size],...],
+    a:[...]}, written every ~0.5 s (collector/state.py _ob_snapshot)
 
-The raw-delta feed only sends updates within its own ~50-level window;
-levels that scroll out of that window are never explicitly zeroed, so a
-naive replay grows the in-memory book unboundedly. This implementation
-periodically prunes to the nearest `keep_levels` price levels per side,
-which is safe because top-N-nearest-touch features never need anything
-beyond that.
+Correction 2026-10: the second schema was originally read as raw
+deltas and merged into a running book. Every line is in fact the whole
+book, so levels that had left the book were never removed (a snapshot
+carries no zero-size entries): on a sample BTC day the merged book was
+crossed (best bid >= best ask) in 100% of samples and held ~685 bid
+levels instead of 50. Each line now replaces the book state.
 """
 from __future__ import annotations
 
@@ -39,10 +39,10 @@ def build_l2_bars(data_dir: Path, sym: str, dates: list[str]) -> pd.DataFrame:
         try:
             with gzip.open(p, "rt", encoding="utf-8") as fh:
                 first = fh.readline()
-            schema = "agg5" if '"bid5"' in first else "raw50"
+            schema = "agg5" if '"bid5"' in first else "snap50"
         except Exception:
             continue
-        day_rows = _load_agg5_day(p) if schema == "agg5" else _load_raw50_day(p)
+        day_rows = _load_agg5_day(p) if schema == "agg5" else _load_snap50_day(p)
         rows.extend(day_rows)
         print(f"  {d} [{schema}]: {len(day_rows)} bar snapshots  [{time.time() - t0:.1f}s]")
     return pd.DataFrame(rows).drop_duplicates(subset="bucket", keep="last").sort_values("bucket")
@@ -52,7 +52,7 @@ def _load_agg5_day(path):
     """Tolerant of truncation/corruption (stops early on a read error
     instead of raising) and of malformed individual lines (skipped).
     Note: this does NOT detect or adapt to a genuine mid-file switch to
-    the raw50 schema -- any line missing 'bid5'/'T' is silently
+    the snap50 schema -- any line missing 'bid5'/'T' is silently
     dropped, so a true schema switch mid-file would show up as a
     gap in coverage for the rest of that day, not a corrupted read."""
     rows, cur_bucket, last = [], None, None
@@ -83,7 +83,7 @@ def _agg5_row(bucket, o):
     # bid5=0.875, ask5=7.178 -> imb=0.1087 == 0.875/(0.875+7.178)) since
     # the original collector code that produced this format is no
     # longer in the codebase. 2*imb-1 rescales it to the same
-    # (bid-ask)/(bid+ask) in [-1, 1] convention used by the raw50 path
+    # (bid-ask)/(bid+ask) in [-1, 1] convention used by the snap50 path
     # in _snapshot() below, so deep_obi5 is comparable across both.
     return dict(bucket=bucket, top5_bid=o["bid5"], top5_ask=o["ask5"],
                 top10_bid=np.nan, top10_ask=np.nan,
@@ -93,10 +93,12 @@ def _agg5_row(bucket, o):
                 whale_ask_ratio=np.nan, whale_ask_dist=np.nan)
 
 
-def _load_raw50_day(path, prune_every=2000, keep_levels=80):
+def _load_snap50_day(path):
+    """Each line is the full book; the last one in a minute is that
+    minute's state."""
     bids: dict[float, float] = {}
     asks: dict[float, float] = {}
-    cur_bucket, rows, n_msg = None, [], 0
+    cur_bucket, rows = None, []
     try:
         with gzip.open(path, "rt", encoding="utf-8") as fh:
             for line in fh:
@@ -108,26 +110,8 @@ def _load_raw50_day(path, prune_every=2000, keep_levels=80):
                 if cur_bucket is not None and bucket != cur_bucket:
                     rows.append(_snapshot(cur_bucket, bids, asks))
                 cur_bucket = bucket
-                for pr, sz in o.get("b", []):
-                    pr, sz = float(pr), float(sz)
-                    if sz == 0.0:
-                        bids.pop(pr, None)
-                    else:
-                        bids[pr] = sz
-                for pr, sz in o.get("a", []):
-                    pr, sz = float(pr), float(sz)
-                    if sz == 0.0:
-                        asks.pop(pr, None)
-                    else:
-                        asks[pr] = sz
-                n_msg += 1
-                if n_msg % prune_every == 0:
-                    if len(bids) > keep_levels:
-                        keep = sorted(bids.keys(), reverse=True)[:keep_levels]
-                        bids = {p: bids[p] for p in keep}
-                    if len(asks) > keep_levels:
-                        keep = sorted(asks.keys())[:keep_levels]
-                        asks = {p: asks[p] for p in keep}
+                bids = {float(pr): float(sz) for pr, sz in o.get("b", []) if float(sz) > 0.0}
+                asks = {float(pr): float(sz) for pr, sz in o.get("a", []) if float(sz) > 0.0}
     except Exception as e:
         print(f"    [WARN] corrupt/truncated orderbook, stopping day early: {path} ({e})")
     if cur_bucket is not None:

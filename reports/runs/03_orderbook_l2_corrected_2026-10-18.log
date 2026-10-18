@@ -1,0 +1,9 @@
+Full 90-day window (2026-04-22 -> 2026-07-20), both orderbook schemas blended:
+  top-of-book only (baseline): AUC=0.5970
+  + top5 book depth/imbalance: AUC=0.5983
+  + whale-wall size ratio:     AUC=0.5939
+
+Restricted to 2026-05-02 -> 2026-07-20 (single schema, 100% feature coverage):
+  baseline:                     AUC=0.5941
+  + top10 depth/book-ratio:     AUC=0.5954
+  + whale-wall size ratio:      AUC=0.5939

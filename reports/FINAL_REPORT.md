@@ -17,6 +17,7 @@ range -- stated explicitly here rather than left implicit:
 | Cross-asset walk-forward (own model) | ETHUSDT, SOLUSDT | Same 90-day window as BTC | `06` |
 | Cross-asset OOS (BTC-trained model scored on another symbol) | ETHUSDT, SOLUSDT | Same 90-day window as BTC | `06` |
 | Independent-year OOS confirmation | **BTCUSDT only** | 2024-02-12 → 2024-06-02 (112 days, third-party archive) | `06` |
+| Forward test (frozen model, scored once on later data) | BTCUSDT; ETHUSDT, SOLUSDT for cross-asset | trained 2026-04-22 → 2026-07-20, scored 2026-07-21 → 2026-10-17 (89 days) | `09`, see §10 |
 
 The third-party 2024 archive is structured to also cover ETH and SOL,
 but this repo's out-of-sample check only trains/scores against its BTC
@@ -25,8 +26,10 @@ should not be assumed from the BTC result.
 
 The collector was upgraded on 2026-05-01 to also capture
 `orderbook.rpi` (retail price improvement) and to switch the main
-`orderbook.50` feed to raw 50-level deltas (previously a coarser
-pre-aggregated top-5 snapshot, see §4) -- 2026-05-01 itself is a
+`orderbook.50` feed to full 50-level book snapshots written every
+~0.5 s (previously a coarser pre-aggregated top-5 snapshot, see §4).
+The original version of this report called the new format "raw
+50-level deltas"; that was wrong, see §4 -- 2026-05-01 itself is a
 partial/transitional day from that restart, so 2026-05-02 is used as
 the clean start of the new format. `orderbook.rpi` is collected but
 not used by any experiment in this repo (not part of the ~80 tested
@@ -87,8 +90,23 @@ large enough to trust.
   value at or before that cutoff).
 - Two of this project's own orderbook capture formats were found
   mid-dataset (an early pre-aggregated top-5-level snapshot format,
-  later replaced by raw 50-level deltas); both are handled by
+  later replaced by full 50-level book snapshots); both are handled by
   `tickml/orderbook_l2.py`.
+- **Found 2026-10, after publication:** the reader for the second
+  format treated each snapshot as a delta and merged it into a running
+  book. A snapshot carries no zero-size entries, so levels that had
+  left the book were never removed. On a sample BTC day the merged
+  book was crossed (best bid >= best ask) in 100% of samples, held
+  ~685 bid levels instead of 50, and its depth features correlated
+  ~0.04 with the correct values. Every L2 result originally published
+  in §4 was computed on those invalid features. Fixed (each line now
+  replaces the book, `tests/test_orderbook_l2.py`), §4 rerun: the
+  conclusion holds, now on valid features.
+- Also checked 2026-10: `walk_forward()` uses the test fold as
+  XGBoost's early-stopping set, which lets the test fold pick the
+  number of trees. Redoing the same folds with the last 5% of the
+  training window as the early-stopping set: AUC 0.5964 vs 0.5970
+  published. Negligible, but the forward test in §10 avoids it.
 
 ## 3. Core finding: horizon and direction
 
@@ -116,24 +134,32 @@ the long side (0.597) — the signal is not directional.
 
 A single-variable logistic regression on rolling realized volatility
 alone reaches 96% of the full 21-feature XGBoost model's AUC. Real L2
-order-book depth (replayed from raw 50-level deltas, not just
-top-of-book), a "whale wall" feature (anomalously large single resting
-order vs. local median), funding rate, and open interest each added no
-measurable improvement.
+order-book depth (50-level book snapshots, not just top-of-book), a
+"whale wall" feature (anomalously large single resting order vs. local
+median), funding rate, and open interest each added no measurable
+improvement.
 
 The collector's own order-book capture changed format mid-dataset
 (2026-05-02: an early pre-aggregated top-5-level snapshot was replaced
-by raw 50-level deltas, see `tickml/orderbook_l2.py`), so the 90-day
-result above blends two collection eras. Rerunning the same comparison
-restricted to the single-schema window (2026-05-02 → 2026-07-20, where
-top10-depth and whale-wall coverage is 100% rather than partial)
-confirms the same conclusion, not an artifact of the blend:
+by full 50-level snapshots, see `tickml/orderbook_l2.py`), so the 90-day
+result blends two collection eras. The table below is restricted to
+the single-schema window (2026-05-02 → 2026-07-20, where top10-depth and
+whale-wall coverage is 100% rather than partial).
 
-| Feature set (2026-05-02 → 2026-07-20 only) | AUC |
-|---|---|
-| Baseline | 0.594 |
-| + top10 depth / book-depth-ratio | 0.593 |
-| + whale-wall size ratio | 0.595 |
+The originally published numbers came from a reader that merged
+snapshots as deltas and produced invalid depth features (see §2). Both
+columns are kept so the correction is visible; the conclusion did not
+change:
+
+| Feature set (2026-05-02 → 2026-07-20 only) | AUC, published (invalid features) | AUC, corrected reader (2026-10) |
+|---|---|---|
+| Baseline | 0.594 | 0.594 |
+| + top10 depth / book-depth-ratio | 0.593 | 0.595 |
+| + whale-wall size ratio | 0.595 | 0.594 |
+
+On the full blended 90-day window the corrected reader gives 0.597
+(baseline), 0.598 (+ top5 depth), 0.594 (+ whale wall). The forward
+test (§10, C6) repeats the check on 89 later days: +0.002.
 
 A full classical technical-indicator library
 (RSI, MACD, Bollinger, ADX, Stochastic, SuperTrend, Hurst exponent,
@@ -232,4 +258,57 @@ property of financial time series — rather than an order-flow,
 order-book, or "smart money" pattern. No tested labeling scheme,
 feature set, model engine, or leverage level converted this ranking
 ability into a profit factor reliably above 1.0 at a sample size large
-enough to trust.
+enough to trust. The 2026-10 forward test (§10) confirms all of this on
+89 days the original study never saw.
+
+## 10. Forward test (2026-10-18)
+
+The collector kept running after the study was published, so 89 new
+days (2026-07-21 → 2026-10-17) exist that no model, feature, or
+threshold in this repository was chosen on. `experiments/09_forward_test.py`
+freezes the original setup (same features, labels, fees, model
+parameters), trains only on 2026-04-22 → 2026-07-20, and scores the new
+window once. The pass/fail criteria are written in the script's
+docstring and were fixed before the first run. Raw output of both reruns is in
+`reports/runs/`. Early stopping uses the
+tail of the training window, never the forward window. One day failed
+the pre-set data-quality rule (< 1380 one-minute bars): 2026-04-22,
+the collector's partial first day, which only affects training. The
+unusually small trades files on 2026-08-15/16 are a quiet weekend
+(all 1440 bars present, volume close to the 2026-08-08/09 weekend), not
+a collection gap.
+
+| Criterion (fixed before the run) | Threshold | Forward result | Verdict |
+|---|---|---|---|
+| C1 ranking signal persists (BTC, max_bars=5) | AUC >= 0.55 and above every shuffled-label run | AUC **0.640**; null mean 0.501, max 0.541 (15 runs) | holds |
+| C2 horizon ordering | AUC falls from max_bars 1 to 10 | 0.723 / 0.681 / 0.661 / 0.640 / 0.619 | holds |
+| C3 it is volatility | logistic(`vol_20`) >= 90% of XGBoost | 0.634 = **99.1%** of XGBoost (0.640) | holds |
+| C4 no tradeable rule | no cell with PF > 1, p <= 0.0056, n >= 200 | 0 of 9 cells; the only PF > 1 cell has n=10 | holds |
+| C5 cross-asset (BTC model on other symbols) | AUC >= 0.55 | ETH 0.591, SOL 0.577 | holds |
+| C6 order-book depth (corrected reader) | depth adds >= +0.005 AUC | +0.002 (depth), -0.001 (whale wall) | depth adds nothing |
+
+Forward AUC is higher than in the original walk-forward (0.640 vs
+0.597 at max_bars=5), while the trade-every-bar profit factor is lower
+(0.32 vs 0.37). Better ranking of bars that still lose after fees is
+the same picture as before, not a step towards an edge.
+
+Threshold rules on the forward window (BTC, PF over every selected
+bar; permutation p is against randomly placed signals with the same
+count, so a small p with PF < 1 means "loses less than random bars",
+not "profitable"):
+
+| max_bars | threshold | n | PF | p |
+|---|---|---|---|---|
+| 1 | 0.50 | 118 | 0.638 | 0.000 |
+| 1 | 0.55 | 40 | 0.658 | 0.001 |
+| 1 | 0.60 | 10 | 2.142 | 0.001 |
+| 3 | 0.50 | 884 | 0.780 | 0.000 |
+| 3 | 0.55 | 395 | 0.769 | 0.000 |
+| 3 | 0.60 | 147 | 0.797 | 0.001 |
+| 5 | 0.50 | 2,221 | 0.700 | 0.000 |
+| 5 | 0.55 | 970 | 0.793 | 0.000 |
+| 5 | 0.60 | 500 | 0.816 | 0.000 |
+
+The one cell above PF 1 (10 trades) is the same small-sample pattern as
+§8, which collapsed on a larger sample. The two §8 configs themselves
+(max_bars=3 thr=0.60, max_bars=1 thr=0.50) score PF 0.80 and 0.64 here.

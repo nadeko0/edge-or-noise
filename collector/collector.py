@@ -4,7 +4,7 @@ Opens persistent connections to Bybit's public linear WS:
   1. publicTrade.{symbol}     -- every trade tick (CVD)
   2. allLiquidation.{symbol}  -- forced liquidation events
   3. tickers.{symbol}         -- OI, funding rate, bid/ask imbalance (1-2s cadence)
-  4. orderbook.50.{symbol}    -- 50-level L2 book deltas
+  4. orderbook.50.{symbol}    -- 50-level L2 book, written as 0.5s snapshots
   5. orderbook.rpi.{symbol}   -- retail price improvement book
 
 All auto-reconnect on disconnect with exponential back-off cap.

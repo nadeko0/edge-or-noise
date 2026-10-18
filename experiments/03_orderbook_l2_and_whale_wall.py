@@ -1,5 +1,5 @@
-"""Does the real L2 order book (replayed from raw 50-level deltas, not
-just the top-of-book already in FEATURE_COLS_FULL) add anything?
+"""Does the real L2 order book (50-level book snapshots, not just the
+top-of-book already in FEATURE_COLS_FULL) add anything?
 Includes a literal 'whale wall' feature: an anomalously large single
 resting order relative to its neighbors near the touch.
 """
@@ -16,7 +16,9 @@ from tickml.orderbook_l2 import build_l2_bars
 def main():
     btc = get_live("BTCUSDT")
 
-    l2_cache = CACHE_DIR / "l2book_BTCUSDT.parquet"
+    # "snap50" in the key: caches built by the pre-2026-10 reader (which
+    # merged snapshots as deltas, see tickml/orderbook_l2.py) must not be reused.
+    l2_cache = CACHE_DIR / "l2book_snap50_BTCUSDT.parquet"
     if l2_cache.exists():
         l2 = pd.read_parquet(l2_cache)
     else:

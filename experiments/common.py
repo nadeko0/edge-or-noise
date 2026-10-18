@@ -29,14 +29,15 @@ LIVE_START, LIVE_END = "2026-04-22", "2026-07-20"
 LIVE_DATES = [d.strftime("%Y-%m-%d") for d in pd.date_range(LIVE_START, LIVE_END)]
 
 
-def get_live(symbol: str) -> pd.DataFrame:
-    # Cache key includes the date range on purpose: if LIVE_START/LIVE_END
-    # ever change, a stale cache from a different range must NOT be
+def get_live(symbol: str, start: str = LIVE_START, end: str = LIVE_END) -> pd.DataFrame:
+    # Cache key includes the date range on purpose: if the range ever
+    # changes, a stale cache from a different range must NOT be
     # silently reused under the new-looking run.
-    cache = CACHE_DIR / f"live_{symbol}_{LIVE_START}_{LIVE_END}.parquet"
+    cache = CACHE_DIR / f"live_{symbol}_{start}_{end}.parquet"
     if cache.exists():
         return pd.read_parquet(cache)
-    df = build_live(symbol, LIVE_DATES)
+    dates = [d.strftime("%Y-%m-%d") for d in pd.date_range(start, end)]
+    df = build_live(symbol, dates)
     df = add_core_features(df)
     df.to_parquet(cache)
     return df
